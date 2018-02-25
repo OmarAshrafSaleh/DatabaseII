@@ -1,0 +1,283 @@
+public static void createTable(String strTableName,
+			String strClusteringKeyColumn,
+			Hashtable<String, String> htblColNameType) throws DBAppException,
+			IOException {
+
+		String path = "C:\\Users\\a\\Desktop";
+		String TableURL = path + "\\" + strTableName;
+
+		Tables.add(TableURL);
+		File table = new File(path, strTableName);
+		if (!(table.exists())) {
+			System.out.println("Creating directory" + table.getName());
+			boolean result = false;
+			try {
+				table.mkdir();
+				result = true;
+			} catch (SecurityException se) {
+
+			}
+			if (result) {
+				System.out.println("Directory created");
+			}
+		} else {
+			System.out.println("Table name already exsist");
+		}
+		String[] CoulmnName = new String[htblColNameType.size()];
+		htblColNameType.keySet().toArray(CoulmnName);
+		 File metadata = new File("C:\\Users\\a\\Desktop\\",
+		 "metadata.csv");
+		 BufferedWriter writer = new BufferedWriter(new FileWriter(metadata));
+		 for (int i = 0; i < htblColNameType.size(); i++) {
+		 String key = "false";
+		 if (CoulmnName[i].equals(strClusteringKeyColumn))
+		 key = "true";
+		 String line = strTableName + "," + CoulmnName[i] + ","
+		 + htblColNameType.get(CoulmnName[i]) + "," + key;
+		 writer.write(line);
+		 writer.newLine();
+		
+		 }
+		 writer.close();
+
+		Page page1 = new Page(strTableName);
+		Page p = Deserialize("C:\\Users\\a\\Desktop\\" + strTableName
+				+ "\\page0.class");
+
+		String[] v = new String[htblColNameType.size()];
+		Collection<String> Value = htblColNameType.values();
+		Value.toArray(v);
+		for (int i = 0; i < v.length; i++) {
+			p.Types.add(v[i]);
+
+			// ********************TEST*********************
+
+			System.out.print(p.Types.get(i) + ",");
+		}
+
+		Set<String> e = htblColNameType.keySet();
+		String[] t = new String[e.size()];
+		e.toArray(t);
+		for (int i = 0; i < t.length; i++) {
+			if (t[i].equals(strClusteringKeyColumn))
+				p.KeyLocation = i;
+
+			// ********************TEST*********************
+
+			System.out.println(t[i] + ",");
+			System.out.println("" + p.KeyLocation + ",");
+
+		}
+		p.Serialize("C:\\Users\\a\\Desktop\\" + strTableName + "\\page0.class");
+	}
+
+	public static Page Deserialize(String Path) {
+		try {
+
+			FileInputStream fileIn = new FileInputStream(Path);
+			ObjectInputStream in = new ObjectInputStream(fileIn);
+			Page p = (Page) in.readObject();
+			in.close();
+			fileIn.close();
+			return p;
+
+		} catch (IOException i) {
+			i.printStackTrace();
+
+		} catch (ClassNotFoundException c) {
+			System.out.println("Employee class not found");
+			c.printStackTrace();
+
+		}
+		return null;
+	}
+
+	public static void insertIntoTable(String strTableName,
+			Hashtable<String, Object> htblColNameValue) throws DBAppException {
+		boolean flag = false;
+		Object[] v = new Object[htblColNameValue.size()];
+		Collection<Object> Value = htblColNameValue.values();
+		Value.toArray(v);
+		ArrayList<Object> values = new ArrayList();
+		for (int s = 0; s < v.length; s++) {
+			values.add(v[s]);
+		}
+		LocalDateTime l = LocalDateTime.now();
+		values.add(l);
+		String PageURL = "C:\\Users\\a\\Desktop\\" + strTableName;
+		Boolean f = false;
+		for (int h = 0; h < Tables.size(); h++) {
+			if (Tables.get(h).equals("C:\\Users\\a\\Desktop\\" + strTableName)) {
+				f = true;
+			}
+		}
+		if (f == false) {
+			throw new DBAppException("The table is not found");
+		}
+		int numOfPages = 0;
+		String page = "C:\\Users\\a\\Desktop\\" + strTableName + "\\" + "page"
+				+ 0 + ".class";
+		Page Temp = Deserialize(page);
+		Set<String> e = htblColNameValue.keySet();
+		String[] t = new String[e.size()];
+		e.toArray(t);
+		for (int i = 0; i < t.length; i++) {
+			
+			if (!(htblColNameValue.get(t[i]).getClass().getName()
+					.equals(Temp.Types.get(i)))) {
+				System.out.println((htblColNameValue.get(t[i]).getClass()
+						.getName()));
+				System.out.println(Temp.Types.get(i));
+				System.out.println("Fuck" + i);
+				throw new DBAppException(
+						"Input does not match column's type !!");
+			}
+		}
+		Temp.Serialize(page);
+		for (final File file : new File(PageURL).listFiles()) {
+			numOfPages++;
+		}
+		numOfPages = numOfPages - 1;
+		for (int k = 0; k < numOfPages + 1; k++) {
+			String page2 = "C:\\Users\\a\\Desktop\\" + strTableName + "\\page"
+					+ k + ".class";
+			Page des = Deserialize(page2);
+			// Boolean f2 = true ;
+			for (int j = 0; j < des.record.size(); j++) {
+				int x = des.KeyLocation;
+				if (values.get(x).equals(des.record.get(j).get(
+						des.KeyLocation)))
+					throw new DBAppException("duplicate occurs");
+			}
+			des.Serialize(page2);
+
+		}
+
+		String page3 = "C:\\Users\\a\\Desktop\\" + strTableName + "\\page" + 0
+				+ ".class";
+		Page des = Deserialize(page3);
+
+		String page4 = "C:\\Users\\a\\Desktop\\" + strTableName + "\\page"
+				+ numOfPages + ".class";
+		Page des1 = Deserialize(page4);
+		if (des.record.size() == 0) {
+			des.record.add(values);
+			des.Serialize(page3);
+			return;
+		}
+		des.Serialize(page3);
+		if ((int) des1.record.get(des1.record.size() - 1).get(des1.KeyLocation) < (int) values
+				.get(des1.KeyLocation)) {
+			if (des1.record.size() == 200) {
+				Page newPage = new Page(strTableName);
+				numOfPages = numOfPages + 1;
+				Page newPage2 = Deserialize("C:\\Users\\a\\Desktop\\"
+						+ strTableName + "\\page" + numOfPages + ".class");
+				newPage2.record.add(values);
+				newPage2.Serialize("C:\\Users\\a\\Desktop\\" + strTableName
+						+ "\\page" + numOfPages + ".class");
+				des1.Serialize(page4);
+				return;
+			} else {
+				des1.record.add(values);
+				des1.Serialize(page4);
+				return;
+			}
+		} else {
+			des1.Serialize(page4);
+			for (int i = 0; i < numOfPages + 1; i++) {
+				String page5 = "C:\\Users\\a\\Desktop\\" + strTableName
+						+ "\\page" + i + ".class";
+				Page des3 = Deserialize(page5);
+				for (int j = 0; j < des3.record.size(); j++) {
+					if ((int) values.get(des3.KeyLocation) < (int) des3.record
+							.get(j).get(des3.KeyLocation)) {
+						des3.record.add(j, values);
+
+						if (des3.record.size() > 200) {
+							des3.Serialize(page5);
+							for (int h = i; h < numOfPages + 1; h++) {
+								if (h == numOfPages) {
+
+									String page6 = "C:\\Users\\a\\Desktop\\"
+											+ strTableName + "\\page" + h
+											+ ".class";
+									Page des4 = Deserialize(page6);
+									if (des4.record.size() > 200) {
+										int n = numOfPages + 1;
+										Page newPage2 = new Page(strTableName);
+										Page np = Deserialize("C:\\Users\\a\\Desktop\\"
+												+ strTableName
+												+ "\\page"
+												+ n + ".class");
+										np.record.add(des4.record
+												.get(des4.record.size() - 1));
+										des4.record.remove(des4.record.size() - 1);
+										np.Serialize("C:\\Users\\a\\Desktop\\"
+												+ strTableName + "\\page"
+												+  n + ".class");
+										des4.Serialize(page6);
+										
+										return;
+									}
+									else {
+											des4.Serialize(page6);
+										return;
+									}
+
+								} else {
+									String page6 = "C:\\Users\\a\\Desktop\\"
+											+ strTableName + "\\page" + h
+											+ ".class";
+
+									Page des4 = Deserialize(page6);
+									
+									int h2 = h + 1;
+									String page7 = "C:\\Users\\a\\Desktop\\"
+											+ strTableName + "\\page" + h2
+											+ ".class";
+									Page des5 = Deserialize(page7);
+									des5.record.add(0, des4.record
+											.get(des4.record.size() - 1));
+									des4.record.remove(des4.record.size() - 1);
+									des4.Serialize(page6);
+									
+									des5.Serialize(page7);
+									
+								
+								}
+							}
+						} else {
+							des3.Serialize(page5);
+							return;
+						}
+					}
+				}
+				des3.Serialize(page5);
+
+			}
+		}
+
+	}
+
+	public static void dis(String p) {
+		int numOfPages = 0;
+		for (final File file : new File("C:\\Users\\a\\Desktop\\" + p)
+				.listFiles()) {
+			numOfPages++;
+		}
+		System.out.println(numOfPages);
+		for (int i = 0; i < numOfPages; i++) {
+			String page = "C:\\Users\\a\\Desktop\\" + p + "\\" + "page" + i
+					+ ".class";
+			Page des = Deserialize(page);
+			//System.out.println(des.record.size() +",,"+ des.pageNum);
+			for (int j = 0; j < des.record.size(); j++) {
+				
+				for (int k = 0; k < des.record.get(j).size(); k++) {
+					System.out.print(des.record.get(j).get(k) + " , ");
+				}
+				des.Serialize(page);
+			}
+		}
+	}
